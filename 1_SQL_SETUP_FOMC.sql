@@ -1,6 +1,6 @@
 --authors: John Heisler & Garrett Frere
+-- Modified by Carlos Carrero to include Git integration & Native PDF read capabilities
 
-USE ROLE SYSADMIN;
 
 --Create our warehouse
 CREATE OR REPLACE WAREHOUSE gen_ai_fsi_wh
@@ -11,6 +11,18 @@ CREATE OR REPLACE DATABASE gen_ai_fsi;
 
 --create your schema
 CREATE OR REPLACE SCHEMA gen_ai_fsi.fomc;
+
+CREATE OR REPLACE API INTEGRATION git_api_integration
+  API_PROVIDER = git_https_api
+  API_ALLOWED_PREFIXES = ('https://github.com/ccarrero-sf/')
+  ENABLED = TRUE;
+
+CREATE OR REPLACE GIT REPOSITORY git_repo
+    api_integration = git_api_integration
+    origin = 'https://github.com/ccarrero-sf/PUBLIC_SNOWFLAKE_AI_PIPELINE';
+
+-- Make sure we get the latest files
+ALTER GIT REPOSITORY git_repo FETCH;
 
 --create stage fed_logic;
 CREATE OR REPLACE STAGE gen_ai_fsi.fomc.fed_logic
@@ -71,17 +83,3 @@ CREATE OR REPLACE TABLE gen_ai_fsi.fomc.pdf_chunks (
     chunk         VARCHAR(16777216)
 );
 
--- In order to go to the public internet and download the PDFs,
--- we need a network rule and external access integration.
-
--- create the network rule
-CREATE OR REPLACE NETWORK RULE gen_ai_fsi.fomc.fed_reserve
-  MODE = EGRESS
-  TYPE = HOST_PORT
-  VALUE_LIST = ('www.federalreserve.gov');
-
--- add the network rule to external access integration
-USE ROLE ACCOUNTADMIN;
-CREATE OR REPLACE EXTERNAL ACCESS INTEGRATION fed_reserve_access_integration
-  ALLOWED_NETWORK_RULES = (FED_RESERVE)
-  ENABLED = TRUE;
